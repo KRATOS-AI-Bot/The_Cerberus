@@ -1,0 +1,63 @@
+
+import json
+
+def generate_sarif(results):
+    sarif = {
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "Cerberus"
+                    }
+                },
+                "results": []
+            }
+        ]
+    }
+
+    for result in results:
+        sarif["runs"][0]["results"].append({
+            "message": {
+                "text": result["message"]
+            },
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "address": {
+                            "fullyQualifiedName": result["file_path"]
+                        },
+                        "region": {
+                            "startLine": result["line_number"],
+                            "endLine": result["line_number"]
+                        }
+                    }
+                }
+            ]
+        })
+
+    return json.dumps(sarif, indent=4)
+
+class Result:
+    def __init__(self, message, file_path, line_number):
+        self.message = message
+        self.file_path = file_path
+        self.line_number = line_number
+
+    def to_dict(self):
+        return {
+            "message": self.message,
+            "file_path": self.file_path,
+            "line_number": self.line_number
+        }
+
+results = [
+    Result("High-Confidence Pattern: AWS Key", "/path/to/file.txt", 10).to_dict(),
+    Result("High Entropy Secret", "/path/to/another_file.txt", 20).to_dict()
+]
+
+sarif = generate_sarif(results)
+print(sarif)
+
+with open('results.sarif', 'w') as f:
+    f.write(sarif)

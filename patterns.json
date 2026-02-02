@@ -7,47 +7,47 @@
         },
         {
             "name": "AWS Secret Access Key",
-            "pattern": "([0-9a-zA-Z/+=]{40})"
+            "pattern": "([0-9a-f]{40}|[0-9a-f]{32})"
         },
         {
             "name": "Gemini API Key",
-            "pattern": "gemini_api_key=[a-zA-Z0-9_\\-]+"
+            "pattern": "gemini_api_key_[a-z0-9_]{10,50}"
         },
         {
             "name": "OpenAPI Key",
-            "pattern": "api_key=[a-zA-Z0-9_\\-]+"
+            "pattern": "Bearer [a-zA-Z0-9._-]{10,50}"
         },
         {
             "name": "Groq API Key",
-            "pattern": "groq_api_key=[a-zA-Z0-9_\\-]+"
+            "pattern": "groq_api_key_[a-z0-9_]{10,50}"
         },
         {
             "name": "GitHub Token",
-            "pattern": "ghp_[a-zA-Z0-9_\\-]+"
+            "pattern": "ghp_[a-zA-Z0-9_-]{10,50}"
         },
         {
             "name": "Slack Token",
-            "pattern": "xoxb-[a-zA-Z0-9_\\-]+"
+            "pattern": "xoxb-[0-9a-zA-Z]{10,50}"
         },
         {
             "name": "Discord Token",
-            "pattern": "discord_token=[a-zA-Z0-9_\\-]+"
+            "pattern": "discord_token_[a-z0-9_]{10,50}"
         },
         {
             "name": "RSA Private Key",
-            "pattern": "-----BEGIN RSA PRIVATE KEY-----[a-zA-Z0-9/\\+\\n]+-----END RSA PRIVATE KEY-----"
+            "pattern": "-----BEGIN RSA PRIVATE KEY-----[a-zA-Z0-9\\n]+-----END RSA PRIVATE KEY-----"
         },
         {
             "name": "DSA Private Key",
-            "pattern": "-----BEGIN DSA PRIVATE KEY-----[a-zA-Z0-9/\\+\\n]+-----END DSA PRIVATE KEY-----"
+            "pattern": "-----BEGIN DSA PRIVATE KEY-----[a-zA-Z0-9\\n]+-----END DSA PRIVATE KEY-----"
         },
         {
             "name": "Stripe Key",
-            "pattern": "sk_live_[a-zA-Z0-9_\\-]+"
+            "pattern": "sk_live_[a-z0-9_]{10,50}"
         },
         {
             "name": "RazorPay Key",
-            "pattern": "razorpay_api_key=[a-zA-Z0-9_\\-]+"
+            "pattern": "razorpay_api_key_[a-z0-9_]{10,50}"
         }
     ]
 }
