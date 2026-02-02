@@ -12,14 +12,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Install dependencies
-        run: |
-          wget https://github.com/zricethezav/gitleaks/releases/download/v8.x.x/gitleaks-v8.x.x-linux-x64.tar.gz
-          tar -xvzf gitleaks-v8.x.x-linux-x64.tar.gz
-          sudo mv gitleaks /usr/local/bin/
-      - name: Run gitleaks
-        run: |
-          gitleaks --config=.gitleaks.toml --verbose
       - name: Run trufflehog
         run: |
           pip install trufflehog
