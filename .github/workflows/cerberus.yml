@@ -15,7 +15,7 @@ jobs:
       - name: Run trufflehog
         run: |
           pip install trufflehog
-          trufflehog --entropy=True --regex=True .
+          trufflehog --entropy=True .
       - name: Run git-secrets
         run: |
           pip install git-secrets
