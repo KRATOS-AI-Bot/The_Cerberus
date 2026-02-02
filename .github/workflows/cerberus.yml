@@ -35,8 +35,3 @@ jobs:
         with:
           name: cerberus-results
           path: cerberus-results.txt
-      - name: Post results to Slack
-        uses: slack/post-message@v1
-        with:
-          webhook: ${{ secrets.SLACK_WEBHOOK }}
-          message: "Cerberus results: $(cat cerberus-results.txt)"
