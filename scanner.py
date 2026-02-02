@@ -33,71 +33,6 @@ def load_patterns(patterns_file):
         patterns = json.load(f)
     return patterns['signatures']
 
-def scan_folder(target_folder, patterns):
-    """
-    Scan the target folder for credentials that match the patterns.
-    """
-    results = []
-    for root, dirs, files in os.walk(target_folder):
-        # Skip excluded directories
-        if '.git' in dirs:
-            dirs.remove('.git')
-        if 'venv' in dirs:
-            dirs.remove('venv')
-        if 'node_modules' in dirs:
-            dirs.remove('node_modules')
-        if '__pycache__' in dirs:
-            dirs.remove('__pycache__')
-
-        for file in files:
-            # Skip image and zip files
-            if file.endswith(('.jpg', '.png', '.gif', '.zip', '.gz', '.bz2', '.xz', '.lzma', '.7z', '.tar', '.tgz', '.tbz2', '.txz')):
-                continue
-
-            file_path = os.path.join(root, file)
-            try:
-                with open(file_path, 'r', errors='ignore') as f:
-                    content = f.read()
-            except Exception as e:
-                print(f"Error reading file {file_path}: {e}")
-                continue
-
-            # Check for regex matches
-            for pattern in patterns:
-                matches = re.findall(pattern, content)
-                if matches:
-                    results.append({
-                        'message': f"Found potential credential in {file_path}",
-                        'locations': [
-                            {
-                                'physicalLocation': {
-                                    'address': {
-                                        'fullyQualifiedName': file_path
-                                    }
-                                }
-                            }
-                        ]
-                    })
-
-            # Check for high entropy strings
-            for line in content.splitlines():
-                entropy = shannon_entropy(line)
-                if entropy > 4.5 and len(line) > 20:
-                    results.append({
-                        'message': f"Found high entropy string in {file_path}",
-                        'locations': [
-                            {
-                                'physicalLocation': {
-                                    'address': {
-                                        'fullyQualifiedName': file_path
-                                    }
-                                }
-                            }
-                        ]
-                    })
-
-    return results
-
 def load_ignore_file(ignore_file):
     """
     Load the ignore file and return a list of paths to skip.
@@ -119,7 +54,15 @@ def main():
 
     results = []
     for root, dirs, files in os.walk(args.target):
+        
+        # Modifying dirs -- remove .git, venv and others from list
+        dirs[:] = [d for d in dirs if d not in ['.git', 'venv', 'node_modules', '.terraform', '__pycache__', '.env']]
+        
         for file in files:
+            
+            # for local testing
+            if file in [".env"]:
+                continue
             file_path = os.path.join(root, file)
             if file_path in ignore_paths:
                 continue
@@ -133,7 +76,7 @@ def main():
 
             # Check for regex matches
             for pattern in patterns:
-                matches = re.findall(pattern, content)
+                matches = re.findall(pattern['pattern'], content)
                 if matches:
                     results.append({
                         'message': f"Found potential credential in {file_path}",
