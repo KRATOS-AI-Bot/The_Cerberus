@@ -31,7 +31,7 @@ jobs:
           pip install semgrep
           semgrep --config=.semgrep.yml
       - name: Upload results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cerberus-results
           path: cerberus-results.txt
