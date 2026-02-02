@@ -5,62 +5,106 @@ import json
 import argparse
 import math
 
-def calculate_shannon_entropy(data):
+def shannon_entropy(string):
+    """
+    Calculate the Shannon entropy of a string.
+    """
+    # Calculate the frequency of each character
+    freq = {}
+    for char in string:
+        if char in freq:
+            freq[char] += 1
+        else:
+            freq[char] = 1
+
+    # Calculate the entropy
     entropy = 0.0
-    for x in range(256):
-        p_x = float(data.count(chr(x)))/len(data)
-        if p_x > 0:
-            entropy += - p_x*math.log(p_x, 2)
-    return entropy
+    for char in freq:
+        prob = freq[char] / len(string)
+        entropy += prob * math.log2(prob)
+
+    return -entropy
 
 def load_patterns(patterns_file):
+    """
+    Load patterns from a JSON file.
+    """
     with open(patterns_file, 'r') as f:
         patterns = json.load(f)
-    return patterns
+    return patterns['signatures']
 
-def load_ignore_file(ignore_file):
-    try:
-        with open(ignore_file, 'r') as f:
-            ignore_paths = [line.strip() for line in f.readlines()]
-        return ignore_paths
-    except FileNotFoundError:
-        return []
-
-def scan_folder(target_folder, patterns, ignore_paths):
+def scan_file(file_path, patterns):
+    """
+    Scan a file for security credentials.
+    """
     results = []
-    for root, dirs, files in os.walk(target_folder):
-        for dir in dirs:
-            if dir in ['.git', 'venv', 'node_modules', '.terraform', '__pycache__']:
-                dirs.remove(dir)
-        for file in files:
-            if file.endswith(('.jpg', '.png', '.gif', '.zip', '.bin', '.exe')):
-                continue
-            file_path = os.path.join(root, file)
-            if any(file_path.startswith(ignore_path) for ignore_path in ignore_paths):
-                continue
-            try:
-                with open(file_path, 'r') as f:
-                    content = f.read()
-                for pattern in patterns['signatures']:
-                    if re.search(pattern, content):
-                        results.append({
-                            'message': f'[ALERT] {pattern} found in {file_path}',
-                            'locations': [{'physicalLocation': {'address': file_path}}]
-                        })
-                        print(f'[ALERT] {pattern} found in {file_path}')
-                entropy = calculate_shannon_entropy(content)
-                if entropy > 7.0:
-                    results.append({
-                        'message': f'[ALERT] High entropy found in {file_path}',
-                        'locations': [{'physicalLocation': {'address': file_path}}]
-                    })
-                    print(f'[ALERT] High entropy found in {file_path}')
-            except Exception as e:
-                print(f'Error scanning {file_path}: {e}')
+    with open(file_path, 'r') as f:
+        content = f.read()
+        for pattern in patterns:
+            matches = re.findall(pattern, content)
+            if matches:
+                results.append({
+                    'message': f"Security credential found: {pattern}",
+                    'locations': [
+                        {
+                            'physicalLocation': {
+                                'address': {
+                                    'fullyQualifiedName': file_path
+                                }
+                            }
+                        }
+                    ]
+                })
+
+        # Check for high entropy secrets
+        for line in content.splitlines():
+            entropy = shannon_entropy(line)
+            if entropy > 4.5 and len(line) > 20:
+                results.append({
+                    'message': f"High entropy secret found: {line}",
+                    'locations': [
+                        {
+                            'physicalLocation': {
+                                'address': {
+                                    'fullyQualifiedName': file_path
+                                }
+                            }
+                        }
+                    ]
+                })
+
     return results
 
-def generate_sarif(results):
-    sarif = {
+def scan_directory(directory, patterns, ignore_file):
+    """
+    Scan a directory for security credentials.
+    """
+    results = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            file_path = os.path.join(root, file)
+            if ignore_file and file_path in ignore_file:
+                continue
+            results.extend(scan_file(file_path, patterns))
+    return results
+
+def main():
+    parser = argparse.ArgumentParser(description='Scan for security credentials')
+    parser.add_argument('--target', help='Target directory to scan')
+    args = parser.parse_args()
+
+    patterns_file = 'patterns.json'
+    patterns = load_patterns(patterns_file)
+
+    ignore_file = None
+    if os.path.exists('.cerberusignore'):
+        with open('.cerberusignore', 'r') as f:
+            ignore_file = [line.strip() for line in f.readlines()]
+
+    results = scan_directory(args.target, patterns, ignore_file)
+
+    # Generate SARIF output
+    sarif_output = {
         'version': '2.1.0',
         'runs': [
             {
@@ -73,18 +117,13 @@ def generate_sarif(results):
             }
         ]
     }
-    return sarif
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--target', help='Target folder or URL')
-    args = parser.parse_args()
-    patterns = load_patterns('patterns.json')
-    ignore_paths = load_ignore_file('.cerberusignore')
-    results = scan_folder(args.target, patterns, ignore_paths)
-    sarif = generate_sarif(results)
     with open('results.sarif', 'w') as f:
-        json.dump(sarif, f, indent=4)
+        json.dump(sarif_output, f, indent=4)
+
+    # Print alerts to console
+    for result in results:
+        print(f'[ALERT] {result["message"]}')
 
 if __name__ == '__main__':
     main()
