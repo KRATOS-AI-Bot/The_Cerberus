@@ -4,85 +4,87 @@ import re
 import json
 import argparse
 import math
-from collections import Counter
 
 def calculate_shannon_entropy(data):
-    """Calculate Shannon entropy for a given string"""
     entropy = 0.0
-    counter = Counter(data)
-    for count in counter.values():
-        p = count / len(data)
-        entropy -= p * math.log(p, 2)
+    for x in range(256):
+        p_x = float(data.count(chr(x)))/len(data)
+        if p_x > 0:
+            entropy += - p_x*math.log(p_x, 2)
     return entropy
 
 def load_patterns(patterns_file):
-    """Load patterns from JSON file"""
     with open(patterns_file, 'r') as f:
         patterns = json.load(f)
-    return patterns['signatures']
+    return patterns
 
-def scan_file(file_path, patterns):
-    """Scan a single file for patterns"""
+def load_ignore_file(ignore_file):
     try:
-        with open(file_path, 'r') as f:
-            content = f.read()
-            for pattern in patterns:
-                if re.search(pattern, content):
-                    yield pattern
-            entropy = calculate_shannon_entropy(content)
-            if entropy > 5.5:  # High entropy threshold
-                yield 'High Entropy'
-    except Exception as e:
-        print(f"Error scanning file {file_path}: {e}")
+        with open(ignore_file, 'r') as f:
+            ignore_paths = [line.strip() for line in f.readlines()]
+        return ignore_paths
+    except FileNotFoundError:
+        return []
 
-def scan_directory(directory, patterns, exclude_folders, exclude_files):
-    """Scan a directory for patterns"""
-    for root, dirs, files in os.walk(directory):
+def scan_folder(target_folder, patterns, ignore_paths):
+    results = []
+    for root, dirs, files in os.walk(target_folder):
         for dir in dirs:
-            if dir in exclude_folders:
+            if dir in ['.git', 'venv', 'node_modules', '.terraform', '__pycache__']:
                 dirs.remove(dir)
         for file in files:
-            if file.endswith(exclude_files):
+            if file.endswith(('.jpg', '.png', '.gif', '.zip', '.bin', '.exe')):
                 continue
             file_path = os.path.join(root, file)
-            yield from scan_file(file_path, patterns)
+            if any(file_path.startswith(ignore_path) for ignore_path in ignore_paths):
+                continue
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                for pattern in patterns['signatures']:
+                    if re.search(pattern, content):
+                        results.append({
+                            'message': f'[ALERT] {pattern} found in {file_path}',
+                            'locations': [{'physicalLocation': {'address': file_path}}]
+                        })
+                        print(f'[ALERT] {pattern} found in {file_path}')
+                entropy = calculate_shannon_entropy(content)
+                if entropy > 7.0:
+                    results.append({
+                        'message': f'[ALERT] High entropy found in {file_path}',
+                        'locations': [{'physicalLocation': {'address': file_path}}]
+                    })
+                    print(f'[ALERT] High entropy found in {file_path}')
+            except Exception as e:
+                print(f'Error scanning {file_path}: {e}')
+    return results
+
+def generate_sarif(results):
+    sarif = {
+        'version': '2.1.0',
+        'runs': [
+            {
+                'tool': {
+                    'driver': {
+                        'name': 'Cerberus'
+                    }
+                },
+                'results': results
+            }
+        ]
+    }
+    return sarif
 
 def main():
-    parser = argparse.ArgumentParser(description='Scan for security credentials')
-    parser.add_argument('--target', help='Target directory or URL', required=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--target', help='Target folder or URL')
     args = parser.parse_args()
-
-    patterns_file = 'patterns.json'
-    patterns = load_patterns(patterns_file)
-
-    exclude_folders = ['.git', 'venv', 'node_modules', '.terraform', '__pycache__']
-    exclude_files = ['.jpg', '.png', '.gif', '.zip', '.bin']
-
-    try:
-        with open('.cerberusignore', 'r') as f:
-            ignore_paths = [line.strip() for line in f.readlines()]
-    except FileNotFoundError:
-        ignore_paths = []
-
-    sarif_file = 'results.sarif'
-    with open(sarif_file, 'w') as f:
-        f.write('{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "Cerberus"}}, "results": []}]}')
-
-    for file_path in scan_directory(args.target, patterns, exclude_folders, exclude_files):
-        if os.path.dirname(file_path) in ignore_paths:
-            continue
-        print(f'[ALERT] {file_path} found in repo {args.target}')
-        with open(sarif_file, 'r+') as f:
-            data = json.load(f)
-            data['runs'][0]['results'].append({
-                'ruleId': 'cerberus',
-                'level': 'error',
-                'message': {'text': f'{file_path} found in repo {args.target}'},
-                'locations': [{'physicalLocation': {'address': file_path}}]
-            })
-            f.seek(0)
-            json.dump(data, f)
-            f.truncate()
+    patterns = load_patterns('patterns.json')
+    ignore_paths = load_ignore_file('.cerberusignore')
+    results = scan_folder(args.target, patterns, ignore_paths)
+    sarif = generate_sarif(results)
+    with open('results.sarif', 'w') as f:
+        json.dump(sarif, f, indent=4)
 
 if __name__ == '__main__':
     main()
